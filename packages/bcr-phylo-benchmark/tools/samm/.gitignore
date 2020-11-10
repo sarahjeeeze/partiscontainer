@@ -1,0 +1,14 @@
+*.pyc
+_output/
+.sconsign.dblite
+.fus*
+*.o
+*.gch
+*.lprof
+*.so
+results/
+*/_output/
+_build/
+partis/
+gctree/
+data_paths.py

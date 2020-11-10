@@ -1,0 +1,36 @@
+# Global variables:
+DATA = LSU
+
+# Sequences:
+
+# The laphabet to use:
+# DNA, RNA or Protein
+alphabet=DNA
+
+use.gaps=no
+
+# The sequence file to use (sequences must be aligned!)
+input.sequence.file=../Data/$(DATA).phy
+
+# The alignment format:
+input.sequence.format=Phylip(order=sequential, type=extended)
+
+#Sites to use:
+# all, nogap or complete (=only resolved chars)
+input.sequence.sites_to_use = complete
+# Specify a maximum amount of gaps: may be an absolute number or a percentage.
+input.sequence.max_gap_allowed = 100%
+
+input.tree.file = ../Data/$(DATA).dnd
+input.tree.format = Newick
+
+optimization.topology = yes
+
+# Should we write the resulting tree? none or file name.
+output.tree.file = $(DATA).pars.dnd
+output.tree.format = Newick
+
+# Bootstrap:
+bootstrap.number = 1000
+bootstrap.output.file = $(DATA).pars_bstrees.dnd
+

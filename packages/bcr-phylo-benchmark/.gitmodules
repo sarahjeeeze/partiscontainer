@@ -1,0 +1,9 @@
+[submodule "tools/gctree"]
+	path = tools/gctree
+	url = https://github.com/matsengrp/gctree.git
+[submodule "tools/samm"]
+	path = tools/samm
+	url = https://github.com/matsengrp/samm.git
+[submodule "tools/IgPhyML"]
+	path = tools/IgPhyML
+	url = https://github.com/kbhoehn/IgPhyML.git

@@ -1,0 +1,59 @@
+# Global variables:
+DATA   = LSU
+METHOD = bionj
+
+# Sequences:
+
+# The alphabet to use:
+# DNA, RNA or Protein
+alphabet=DNA
+
+# The sequence file to use (sequences must be aligned!)
+input.sequence.file=../Data/$(DATA).phy
+
+# The alignment format:
+input.sequence.format=Phylip(order=sequential, type=extended)
+
+#Sites to use:
+# all, nogap or complete (=only resolved chars)
+input.sequence.sites_to_use = complete
+# Specify a maximum amount of gaps: may be an absolute number or a percentage.
+input.sequence.max_gap_allowed=100%
+
+# Output the distance matrix if any.
+output.matrix.file = $(DATA).mat
+
+# ----------------------------------------------------------------------------------------
+#                                     Model specification
+# ----------------------------------------------------------------------------------------
+# See the manual for a description of the syntax and available options.
+#
+model = HKY85(kappa=2.843, theta=0.5, theta1=0.5, theta2=0.5, useObservedFrequencies=yes)
+
+rate_distribution = Gamma(n=4, alpha=0.358)
+
+# Tree reconstruction method [wpgma|upgma|nj|bionj]
+method = $(METHOD)
+// Parameter estimation:
+// - init = keep as initial values,
+// - pairwise = estimate separately for each pair of sequences,
+// - iterations = use iterations and ML to estimate these parameters globally.
+optimization.method = init
+optimization.verbose = 1
+optimization.ignore_parameter =
+optimization.max_number_f_eval = 10000
+optimization.tolerance = 0.000001
+optimization.message_handler = $(DATA).messages
+optimization.profiler = $(DATA).profile
+
+# Should we write the resulting tree? none or file name.
+output.tree.file = $(DATA).$(METHOD).dnd
+output.tree.format = Newick
+
+# Bootstrap:
+bootstrap.number = 10
+bootstrap.approximate = no
+# Set this to yes for detailed output when bootstrapping. 
+bootstrap.verbose = no
+bootstrap.output.file = $(DATA).$(METHOD)_bstrees.dnd
+

@@ -1,0 +1,10 @@
+name,seconds
+cache-parameters-simu,28.57068181037903
+annotate-new-simu,9.238843202590942
+seed-partition-new-simu,2.0966718196868896
+get-selection-metrics-new-simu,2.0060980319976807
+partition-new-simu,22.312654972076416
+simulate,12.438822031021118
+multi-annotate-new-simu,12.678339004516602
+cache-parameters-data,17.264246940612793
+vsearch-partition-new-simu,4.904826879501343

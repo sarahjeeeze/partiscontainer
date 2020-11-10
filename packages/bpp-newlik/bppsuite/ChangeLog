@@ -1,0 +1,237 @@
+19/03/18 -*- Version 2.4.0 -*-
+
+19/02/18 Julien Dutheil
+* Bug fixed in bppPopStats: dN and dS were inverted!
+
+10/12/17 -*- Version 2.3.2 -*-
+
+06/11/17 Julien Dutheil
+* Added estimation of kappa to bppPopStats + bugs fixed
+
+06/06/17 -*- Version 2.3.1 -*- 
+
+10/05/17 -*- Version 2.3.0 -*- 
+
+21/12/16 Julien Dutheil
+* BppPhySamp migrated to its own package.
+
+17/12/16 Julien Dutheil
+* Improved bppPopStats, outgroup analyses, MK table and output to file.
+
+06/10/16 Julien Dutheil
+* bppSeqGen now takes Hudson's MS ARG files as input.
+* new input.tree.scale option to adjust branch lengths.
+
+22/05/16 Julien Dutheil
+* bpppopstats now computes codon statistics per site (e.g. PiN, PiS)
+* Added example for bpppopstats.
+
+29/06/15 Julien Dutheil
+* New program bppPopStats
+
+28/01/15 Julien Dutheil
+* PhySamp now outputs the correct tree!
+
+25/11/14 Julien Dutheil
+* bppalnscore output contiguous segments in mase selection.
+* bppalnscore site selection works with codon alphabets.
+
+24/11/14 Julien Dutheil
+* bppSeqMan can now read alignments and perform site selection priori to any analysis.
+
+28/09/14 -*- Version 2.2.0 -*- 
+
+16/09/14 Julien Dutheil
+* bppSeqGen supports generic characters as ancestral states in info file (bug #87).
+
+12/08/14 Julien Dutheil
+* bppSeqGen supports simulation under Markov-Modulated models.
+
+06/06/14 Julien Dutheil
+* bppPhySamp now ouput trees as well.
+
+17/04/14 Julien Dutheil
+* bppSeqMan: Translate uses global genetic_code argument instead of local 'code' argument.
+* All programs use the --seed argument to set random seed for reproduceable results.
+
+08/03/13 -*- Version 0.8.0 -*-
+
+22/01/13 Julien Dutheil
+* Compiles with -Wconversion
+
+14/01/13 Mathieu Groussin
+* Added COaLA model for proteins in bppML and bppSeqGen.
+
+23/11/12 Laurent Guéguen
+* New bppMixedLikelihood program
+
+08/02/12 -*- Version 0.7.0 -*-
+
+21/12/11 Julien Dutheil
+* New bppAlnScore program
+* Improved bppSeqMan: protein translation now works + more stop codons removal options.
+
+17/06/11 Julien Dutheil
+* Improved bppancestor, also allows to compute frequencies for leaves.
+
+11/06/11 -*- Version 0.6.2 -*-
+* Small bug fixed + new packages.
+
+03/06/10 -*- Version 0.6.0 -*-
+* Compatibility with Bio++ 2.0.0.
+
+03/06/10 Julien Dutheil
+* New method in bppPhySamp + new, faster, implementation.
+
+25/03/10 -*- Version 0.5.0 -*-
+
+22/08/09 Julien Dutheil
+* Added CMake configuration files, with twick for building the manual (assumes
+		texinfo is installed).
+
+22/07/09 Julien Dutheil
+* Added program bppTreeDraw.
+
+30/06/09 Julien Dutheil
+* BppAncestor: now output expected ancestral states frequencies.
+* BppAncestor: new method to compute EB estimates of ancestral states frequencies.
+
+10/06/09 -*- Version 0.4.0 -*-
+
+22/05/09 Julien Dutheil
+* Keyval syntax for sequence format description.
+* Documentation and example update.
+* SeqMan now uses the SequenceApplicationTools method.
+
+15/05/09 Julien Dutheil
+* Compatibility update with the libs, new keyval syntax for model
+specification.
+* Documentation up to date.
+
+02/02/09 Julien Dutheil
+* bppConsense now outputs the number of leaves of the input tree.
+* New progress bar in bppConsense.
+
+08/01/09 Julien Dutheil
+* Added texinfo documentation.
+* More bootstrap options in BppDist (the same as in BppML).
+
+25/09/08 -*- Version 0.3.1 -*-
+
+07/12/08 Bastien Boussau & Julien Dutheil
+* Bug removed in non-homogeneous models with covarions.
+
+09/10/08 Julien Dutheil
+* New action 'invert' in bppSeqMan.
+
+25/09/08 -*- Version 0.3.0 -*-
+
+20/09/08 Julien Dutheil
+* New program bppAncestor to reconstruct acestral states and rates.
+* New +F models from PhylLib. 
+
+02/07/08 Laurent Guegen
+* Bug fixed in bppML: frequencies can be computed from the data with
+non-homogeneous models.
+
+19/06/08 Julien Dutheil
+* Shell variables are now 'global' in option files.
+
+24/04/08 -*- Version 0.2.3 -*-
+* This version requires the CVS version of Bio++ to be built.
+
+03/03/08 Julien Dutheil
+* Bug fixed in keep_complete method of BppSeqMan.
+
+27/03/08 Julien Dutheil
+* Bug fixed when printing parameters of non-homogeneous models in bppML.
+
+22/01/08 -*- Version 0.2.2 -*-
+
+28/02/08 Celine Scronavacca
+* Bug fixed in ReRoot.
+
+22/01/08 -*- Version 0.2.1 -*-
+
+06/02/08 Celine Scornavacca
+* Bug fixed in ReRoot + correction of version number in bppSeqGen.
+
+22/01/08 -*- Version 0.2.0 -*-
+
+13/01/08 Julien Dutheil
+* More options in bppml: possibility to chose between simple and double
+recursion and data compression method.
+* Simple recursion method improved.
+
+11/01/08 Julien Dutheil
+* Compatibility update
+* bppML now output more handy parameter values.
+
+31/12/07 Julien Dutheil
+* New program Phylo Sampler.
+
+07/11/07 Julien Dutheil
+* Compatibility update with Bio++ cvs.
+* Bug fixed in BppSeqGen.
+* BppSeqGen can now simulate datas from a set of trees (ancestral
+  recombination graph).
+
+25/10/07 Julien Dutheil
+* Several bug fixed in BppML and BppSeqGen with non-homogeneous models.
+* Examples updated + new example option files for non-homogeneous models.
+
+05/10/07 Bastien Boussau & Julien Dutheil
+* Non-homogenous sequence simulation in BppSeqGen.
+* Model options in files have changed to suit the non-homogeneous case.
+  The covarion option now is fully part of the model options, following the
+	new syntax 'model=modelname+covarionname', eg 'T92+G2001'.
+
+03/10/07 Julien Dutheil
+* New program Bio++ Sequence Manipulator
+
+21/09/07 Julien Dutheil
+* Bug fixed in BppDist: branch length are indeed not estimated when parameters
+  to ignore contains "BrLen".
+* Stop condition when using iterations is now based on topological distance
+  instead of likelihood comparisons (phyllib).
+* New option optimization.topology_nni.method = [fast|better|phyml]
+
+17/06/07 -*- Version 0.1.0 -*-
+
+16/07/06 Julien Dutheil
+* New option bootstrap.verbose for bppML.
+* Bug fixed in bootstrap computation.
+
+06/06/06 Julien Dutheil
+* New program bppConsense.
+
+05/05/07 Julien Dutheil
+* First alpha release of bppsuite.
+
+-*- Old bppML ChangeLog -*-
+
+23/04/07 Julien Dutheil
+- Optimization with a global clock.
+- Possibility to set branch lengths before ML optimization, with different
+  methods.
+
+25/01/07 Julien Dutheil
+* Version 1.0.0
+- Topology search for ML
+- User input tree may be random, nj or bionj.
+- Possibility to make a parsimony search before ML estimation.
+
+28/08/06 Julien Dutheil
+* Version 0.2.0
+- Covarion models
+- New optimization methods.
+
+30/05/06 Julien Dutheil
+* option --enable-static in configure.
+
+19/04/06 Julien Dutheil
+* Version 0.1.2
+* Update for library compatibility
+* Check for 0 branch lengths leading to 0 likelihood before optimization.
+* New output.estimates options to get the final parameter values after optimization.
+

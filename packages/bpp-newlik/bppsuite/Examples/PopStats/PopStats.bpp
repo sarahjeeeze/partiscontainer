@@ -1,0 +1,12 @@
+input.sequence.file.ingroup = alignment.phy
+input.sequence.format.ingroup = Phylip(order=interleaved, type=classic)
+estimate.kappa = yes
+pop.stats= \
+    SiteFrequencies,\
+    Watterson75,\
+    Tajima83,\
+    TajimaD,\
+    FuAndLiDStar(tot_mut=no),\
+    FuAndLiFStar(tot_mut=no),\
+    FuAndLiDStar(tot_mut=yes),\
+    FuAndLiFStar(tot_mut=yes),\
