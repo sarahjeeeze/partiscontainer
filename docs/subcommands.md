@@ -1,0 +1,428 @@
+  - [annotate](#annotate) find most likely annotation for each sequence
+  - [partition](#partition) cluster sequences into clonally-related families, and annotate each family
+  - [merge-paired-partitions](#merge-paired-partitions) use heavy/light pairing information to synchronize/improve partitions from heavy and light chains
+  - [get-selection-metrics](#get-selection-metrics) calculate selection metrics (lbi, lbr, consensus distance, etc) on existing output file
+  - [view-output](#view-output) print the partitions and/or annotations from an existing output file
+  - [cache-parameters](#cache-parameters) write parameter values and HMM model files for a given data set (if needed, runs automatically before annotation and partitioning)
+    - [germline sets](#germline-sets)
+  - [simulate](#simulate) make simulated sequences
+  - [miscellany](#miscellany)
+    - [paired heavy and light chains](#paired-heavy-and-light-chains)
+    - [naive probability estimates](#naive-probability-estimates)
+    - [input meta info](#input-meta-info)
+	- [naive sequence comparison with linearham](#naive-sequence-comparison-with-linearham)
+
+### Subcommands
+
+The `partis` command has a number of actions:
+
+```
+partis annotate | partition | get-selection-metrics | view-output | cache-parameters | simulate
+```
+
+For information on options for each subcommand that are not documented in this manual run `partis <subcommand> --help`.
+
+For the sake of brevity, the commands below invoke partis with no leading path, which will work if you've either:
+  - linked the binary into to a directory that's already in your path, e.g. `ln -s /path/to/<partis_dir/bin/partis ~/bin/` or
+  - added the partis `bin/` to your path: `export PATH=/path/to/<partis_dir/bin/:$PATH`
+The other option is to specify the full path with each call `/path/to/<partis_dir>/bin/partis`.
+
+### annotate
+
+In order to find the most likely annotation (VDJ assignment, deletion boundaries, etc.) for each single sequence, run
+
+```
+partis annotate --infname test/example.fa --outfname _output/example.yaml
+```
+
+For information on parsing the output file, see [here](#output-formats.md).
+
+### partition
+
+In order to cluster sequences into clonal families and annotate each family, run
+
+```
+partis partition --infname test/example.fa --outfname _output/example.yaml
+```
+
+For information on parsing the output file, see [here](#output-formats.md).
+
+By default, this uses the most accurate and slowest method: hierarchical agglomeration with, first, hamming distance between naive sequences for distant clusters, and full likelihood calculation for more similar clusters. This method is typically appropriate (finishing in minutes to tens of hours) for tens of thousands of sequences on a laptop, or hundreds of thousands on a server. Because the usual optimizations that prevent clustering time from scaling quadratically with sample size do not translate well to BCR rearrangement space (at least not if you care about getting accurate clusters), run time varies significantly from sample to sample, hence the large range of quoted run times.
+
+There are also a number of options for speeding things up either by sacrificing accuracy for speed, or by ignoring sequences you don't care about:
+
+##### subsampling
+
+The simplest way to go faster is to only use some of your sequences. You can choose a random subset with `--n-random-queries <n>` (random seed is set with `--seed <n>`), or take the first `n` sequences with `--n-max-queries <n>`. You can also limit it to specific sequence ids using `--queries <a:b:c>`, where `a:b:c` is a colon-separated list of sequence ids.
+
+##### `--seed-unique-id <id>`
+
+Ignores sequences that are not clonally related to the sequence specified by `<id>`, and is consequently vastly faster than partitioning the entire sample. You can specify the sequence rather than the id with `--seed-seq <seq>`.
+
+##### `--naive-vsearch`
+
+As for the default clustering method, first calculates the naive ancestor for each sequence, but then passes these to vsearch for very fast, very heuristic clustering.
+Vsearch is extremely fast, because it includes a large number of optimizations to avoid all-against-all comparison, and thus scales much better than quadratically.
+Because these optimizations (like any purely distance-based approach) know nothing about VDJ rearrangement or SHM, however, they significantly compromise accuracy.
+This is nevertheless a thoroughly reasonably way to get a rough idea of the lineage structure of your sample.
+After running vsearch clustering, you can always pass families of interest (e.g. with `--seed-unique-id`) to the more accurate clustering method.
+
+##### ignore smaller clusters
+
+If you're mostly interested in larger clonal families, you can tell it to cluster as normal for several partitition steps, then discard smaller families (for a description of partition steps, see the paper). Any large families will have accumulated appreciable size within the first few partition steps, and since most real repertoires are dominated by smaller clusters, this will dramatically decrease the remaining sample size. This is turned on by setting `--small-clusters-to-ignore <sizes>`, where `<sizes>` is either a colon-separated list of clusters sizes (e.g. `1:2:3`) or an inclusive range of sizes (e.g. `1-10`). The number of steps after which these small clusters are removed is set with `--n-steps-after-which-to-ignore-small-clusters <n>` (default 3).
+
+##### limit maximum cluster size
+
+Cases where memory is a limiting factor typically stem from a sample with several very large families. Some recent optimizations mean that this doesn't really happen any more, but limiting clonal family size with `--max-cluster-size N` nevertheless can reduce memory usage. Care must be exercised when interpreting the resulting partition, since it will simply stop clustering when any cluster reaches the specified size, rather than stopping at the most likely partition.
+
+##### annotation uncertainties
+
+In order to get an idea of the uncertainty on a given cluster's naive sequence and gene calls, you can specify `--calculate-alternative-annotations` during the partition step.
+This will write all the annotations for intermediate sub-clusters to the output file so that it counts up how many subclusters "voted" for each alternative naive sequence or gene call.
+Since most annotation uncertainty in large-ish families boils down to two sub-families disagreeing about, say, which is the correct D gene, this approach typically does a decent job of spanning the real uncertainty (despite being quite heuristic).
+The resulting information can be accessed either by pulling out the resulting ['alternative-annotations' key](output-formats.md#description-of-keys) from the output file, or by running view-alternative-annotations (or running the partition step with `--debug 1`).
+For instance:
+
+```
+partis partition --infname test/example.fa --outfname _output/example.yaml --calculate-alternative-annotations
+partis view-alternative-annotations --outfname _output/example.yaml  # pipe this to less by adding "| less -RS"
+```
+
+If you only care about one cluster, you can print only the cluster corresponding to a given set of queries by setting `--queries <queries:of:interest>` in the second step.
+This second command prints an ascii representation of the various naive sequences and gene calls, as well as summaries of how many unique sequences and clusters of various sizes voted for each naive sequence and gene call.
+
+##### progress file
+
+Since individual steps of the partition algorithm can be somewhat time consuming, during each step we periodically update a file with clustering status information so you can monitor progress.
+This file is written to the working directory, which you've either set, or is under `/tmp/$USER/hmms`.
+The easiest way to find the working directory is to run an appropriate `ps` command to get the complete command lines of each subprocess (for instance `ps -Ho pid,args` or `ps -eo pcpu,pmem,rss,cputime:12,stime:7,user,pid,args:100 --sort pmem,pcpu`, depending if you're running from the terminal that called partis or not).
+For instance running the former in a terminal in which I've backgrounded the partis command gives (so the parent python process is currently clustering with one bcrham subprocess):
+
+```
+  PID COMMAND
+ 2677 -bash
+ 4685   python ./bin/partis partition --infname test/reference-results/test/simu.yaml
+ 4734     /home/dralph/work/partis/packages/ham/bcrham --algorithm forward --hmmdir /home/dralph/work/partis/_output/test_reference-results_test_simu/hmm/hmms --datadir /tmp/dralph/hmms/902992/germline-sets --infile /tmp/dralph/hmms/902992/hmm_input.csv --outfile /tmp/dralph/hmms/902992/hmm_output.csv --locus igh --random-seed 1554239923 --input-cachefname /tmp/dralph/hmms/902992/hmm_cached_info.csv --output-cachefname /tmp/dralph/hmms/902992/hmm_cached_info.csv --partition --max-logprob-drop 5.0 --hamming-fraction-bound-lo 0.015 --hamming-fraction-bound-hi 0.0711739130435 --logprob-ratio-threshold 18.0 --biggest-naive-seq-cluster-to-calculate 15 --biggest-logprob-cluster-to-calculate 15 --n-partitions-to-write 10 --write-logprob-for-each-partition --ambig-base N
+ 6836   ps -Ho pid,args
+```
+
+There will be a progress file for each subprocess in the clustering step, in their own subdirectories, and the name of each progress file will look like `<stuff>.progress`.
+A few lines from a typical progress file might look like:
+
+```
+      Apr 02 14:19:35    1850 clusters        45160 / 32857084 kB =  0.137 %           calcd:   vtb 281   fwd 0     hfrac 154382          merged:  hfrac 1    lratio 0                  clusters:  38 30 15 7 7 7 7 7 6 6 6 6 6 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2  (1569 singletons)
+      Apr 02 14:29:22    1841 clusters        47068 / 32857084 kB =  0.143 %           calcd:   vtb 281   fwd 0     hfrac 155609          merged:  hfrac 10   lratio 0                  clusters:  38 30 15 7 7 7 7 7 7 6 6 6 6 6 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2  (1564 singletons)
+      Apr 02 14:29:53    1813 clusters        50876 / 32857084 kB =  0.155 %           calcd:   vtb 289   fwd 0     hfrac 159161          merged:  hfrac 38   lratio 0                  clusters:  38 30 15 13 11 9 9 7 7 7 7 7 6 6 6 6 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2  (1542 singletons)
+```
+
+The columns are:
+  * time the line was written. There are a number of points in the clustering code that trigger a progress file write, but typically a new line is written once each time it loops through all the current clusters looking for merges.
+  * total number of clusters
+  * memory allocated to this clustering process (i.e. bcrham).
+  * total number of viterbi, forward, and naive hamming fraction calculations that have so far been made
+  * total number of cluster merges that have so far been performed, broken down into hamming fraction merges and likelihood ratio (i.e. forward calculation) merges
+  * a list of all cluster sizes in the current partition
+
+### merge-paired-partitions
+
+In order to partition data that has heavy/light chain pairing information, each locus must first be split into separate files.
+One quick way to do this is by running `./bin/split-loci.py`.
+Each pair of heavy/light sequences must also have the same unique id: this is how partis determines which sequences in the heavy and light files go together.
+The paired clustering entails two steps: first clustering each locus individually, and then merging the information from each locus pairing to create a joint partition.
+In many cases, for example, the second step simply involves splitting light chain clusters that have different heavy chain cdr3 lengths.
+Since light chains are many orders of magnitude less diverse, this results in a vastly more accurate light chain partition.
+
+If you were only running igh/igk pairing, you could do both steps with one command:
+```
+partis partition --paired-loci igh:igk --infname <igh-input-file> --light-chain-infname <igk-input-file> --outfname <igh-output-file> --light-chain-outfname <igk-output-file>
+```
+Alternatively, you can partition each locus separately:
+```
+for locus in igh igk igl; do
+	partis partition --locus --infname <$locus-input-file> --outfname <$locus-output-file>
+done
+```
+then merge each heavy/light pairing
+```
+for hlpair in igh:igk igh:igl; do
+	partis merge-paired-partitions --paired-loci $hlpair --outfname <heavy-partition-file> --light-chain-outfname <light-partition-file> --paired-outfname <$hlpair-joint-output-file>
+done
+```
+
+You can also simulate paired heavy/light repertoires (see below).
+
+### get-selection-metrics
+
+Calculate quantities for prediction of fitness/affinity.
+At the moment these are: AA distance to clonal family consensus sequence (aa-cdist), and local branching index and ratio (lbi and lbr).
+aa-cdist is an excellent predictor of an antibody's affinity for an antigen, but it has no information about what that antigen is, so it should be paired with some method using non-sequence information, such as vaccination or cell sorting (see Discussion in selection metric [paper](https://arxiv.org/abs/2004.11868)).
+Given an antibody of interest and its inferred ancestral lineage lbr is an excellent predictor of which branches between those ancestors are likely to contain affinity-increasing mutations.
+In order to infer ancestral sequences, you should run a separate program that includes actual phylogenetic inference, such as [linearham](https://github.com/matsengrp/linearham/) or [RAxML](https://cme.h-its.org/exelixis/web/software/raxml/index.html).
+You can either run the `get-selection-metrics` action on an existing partis output file, or add `--get-selection-metrics` when running the `partition` action.
+The former is generally better, since you can then pass in your own separately-inferred trees with `--treefname`, and also run several different versions without having to re-partition.
+Both lbi and aa-cdist can include multiplicity information for each sequence (e.g. from expression levels), see [below](#input-meta-info).
+
+Both lbi and lbr need a tree, so unless you pass in your own, partis will make one.
+Since we want this to be fast enough to run on all the families in a large repertoire, this uses a fairly heuristic approach to calculating trees.
+If this is run in the context of partitioning (so there's a clustering path available from hierarchical agglomeration), then that clustering path is used as the starting point for the tree.
+It is then refined by replacing any subtrees stemming from large multifurcations with a subtree inferred using FastTree (for instance, the first clustering step is to merge all sequences with similar inferred naive sequences, which results in such subtrees).
+If no clustering path information is available, FastTree is used to infer the tree for the entire cluster.
+This will make a tree for each cluster in the best partition that's larger than --min-tree-metric-cluster-size (default), and any additional clusters specificied by --write-additional-cluster-annotations, --calculate-alternative-annotations, --min-largest-cluster-size, etc., or restricted with --cluster-index.
+
+If you'd like a modern, browser-based package for visualizing the families and their trees and annotations, have a look at our other project, [Olmsted](https://github.com/matsengrp/olmsted/).
+
+### view-output
+
+To print the partitions and/or annotations in an existing output file, run
+
+``` 
+partis view-output --outfname _output/example.yaml | less -RS
+```
+You can also send std out to a log file `>log.txt` instead of piping to `less -RS`.
+
+### cache-parameters
+
+This is run automatically if `--parameter-dir` doesn't exist (whether this directory is specified explicitly, or is left as default).
+So you do not, generally, need to run it on its own.
+
+When presented with a new data set, the first thing we need to do is infer a set of parameters, a task for which we need a preliminary annotation.
+As such, partis first runs ig-sw's Smith-Waterman algorithm on the data set.
+The smith-waterman annotations are used to build and write out a parameter set, which is in turn used to make a set of HMM model files for each observed allele.
+These files are then passed as input to a second, HMM-based, annotation step, which again outputs (more accurate) parameter values and HMM model files.
+
+To explicitly run this parameter caching step by itself:
+
+``` 
+partis cache-parameters --infname test/example.fa --parameter-dir _output/example
+```
+
+The resulting parameter csvs from Smith-Waterman and the HMM are put into `/sw` and `/hmm` subdirectories of `--parameter-dir`.
+Within each of these, there are a bunch of csv files with (hopefully) self-explanatory names, e.g. `j_gene-j_5p_del-probs.csv` has counts for J 5' deletions subset by J gene.
+The hmm model files go in the `hmms/` subdirectory, which contains yaml HMM model files for each observed allele.
+
+If you don't specify `--parameter-dir`, it defaults to a location in the current directory that amounts to a slight bastardization of your input file path (e.g. parameters for `path/to/seqs.fa` will go in `_output/path_to_seqs/`).
+This default is designed such that with typical workflows, if your input files have different paths, their parameters will go in different places.
+If you run once, and then put different sequences in the same input file, this convention obviously horribly breaks (you'll be applying the parameters from the sequences in the old file contents to the new file).
+
+If `--parameter-dir` (whether explicitly set or left as default) doesn't exist, partis assumes that it needs to cache parameters, and does that before running the requested action.
+
+Whether caching parameters or running on pre-existing parameters, the hmm needs smith-waterman annotations as input.
+While this preliminary smith-waterman step is fairly fast, it's also easy to cache the results so you only have to do it once.
+By default these smith-waterman annotations are written to a yaml file in `--parameter-dir` during parameter caching (default path is `<parameter_dir>/sw-cache-<hash>.yaml` where `<hash>` is a hash of the input sequence ids).
+(Because all sequences need to be aligned and padded to the same length before partititioning, the smith-waterman annotation information for each sequence depends slightly on all the other sequences in the file, hence the hash.)
+These defaults should ensure that with typical workflows, smith-waterman only runs once.
+If however, you're doing less typical things (running on a subset of sequences in the file), if you want smith-waterman results to be cached you'll need to specify `--sw-cachefname` explicitly, and it'll write it if it doesn't exist, and read from it if it does.
+
+#### germline sets
+
+By default partis infers a germline set for each sample during parameter caching, using as a starting point the germline sets in `data/germlines/<--species>`.
+The resulting per-sample germline sets are written both to the output yaml file (if you've set `--outfname`), and to `<--parameter-dir>/hmm/germline-sets` (as three fasta files and a meta-info csv).
+To start from a non-default germline set, use `--initial-germline-dir <dir>.`
+This dir must use the same format as `data/germlines/<--species>`, i.e. have a subdir for the `--locus` you want to run, and in that subdir have a fasta file for v, d, and j, and a csv file with the (zero-indexed!) conserved codon positions for each v/j gene.
+The easiest way to construct this is to copy the files from `data/germlines/<--species>`, and then substitute the fasta files for your own.
+Partis aligns any genes that are missing codon information against genes with known info, so as long as there's some overlap with the default germline, it should be able to figure out a position for each gene.
+
+If you want to be more careful, it's a good idea to check how it's figuring out the extras.csv info.
+You can do this (after modifying the new dir) by running the following lines, for example by adding them to the top of bin/example-output-processing.py (just after it imports glutils):
+
+```
+ref_glfo = glutils.read_glfo('data/germlines/human', locus='igh', debug=True)
+new_glfo = glutils.read_glfo('new-germline-dir', locus='igh', template_glfo=ref_glfo, debug=2)  # adds missing codon info
+print 'cleaned up glfo:'
+glutils.print_glfo(new_glfo)  # print the cleaned up glfo
+glutils.write_glfo('cleaned-up-new-germline-dir', new_glfo, debug=True)
+sys.exit()
+```
+
+Where we pass the `ref_glfo` as a template glfo, which makes it more likely to be able to figure out the cyst/tryp/phen info. And you'll probably want to pipe to `|less -RS`, especially if on a laptop.
+
+
+By default, if `--species` is set to human this only looks for alleles that are separated by point mutations from existing genes.
+This is appropriate for humans, since the known germline set is fairly complete.
+For species for which the known germline sets are much less complete (e.g. macaque and mice), it makes sense to also look for alleles that are separated by indels and/or many SNPs from existing genes.
+This is the default for non-human species, and is equivalent to turning on `--allele-cluster`.
+
+At the moment we only infer germline sets for V, and not for D and J (although we plan to fix this).
+This isn't horribly nonsensical, since there is much less variation in D and J, but it does mean that you should treat the D germline set, in particular, with quite a bit of skepticism.
+
+We unfortunately do not yet have a way to report simple confidence estimates for each gene in the inferred germline set.
+There is, however, a wealth of information that can be used to get a good sense of this confidence [here](germline-inference.md).
+
+### simulate
+
+Default simulation [requires installation](install.md#simulation) of two additional R packages (and R, if you don't have it).
+
+There are two main partis-only simulation modes (with options for running hybrids between the two), plus you can combine partis with the [bcr-phylo](http://dx.doi.org/10.3389/fimmu.2018.02451) package (which is included, although you may need to run `git submodule update`):
+  1. you pass it an inferred parameter directory with `--parameter-dir` (e.g. `test/reference-results/test/parameters/simu`) and it mimics the sample from which those parameters were inferred
+  2. simulate from scratch with no input from you, using a variety of plausible heuristics to choose genes, deletion lengths, shm targeting, etc. Example: `./bin/partis simulate --simulate-from-scratch --outfname simu.yaml --n-sim-events 3 --debug 1`
+  3. partis simulates a naive rearrangement, then passes it to bcr-phylo for mutation (as used in the [selection metric paper](https://arxiv.org/abs/2004.11868))
+
+Using 1. is generally preferred over 2., since in a number of ways (especially mutation) the results will more faithfully recreate a realistic BCR repertoire, while 3. is preferred if you want to manipulate the details of the GC selection process (rather than crude output parameters like the number of leaves or tree depth).
+If you did not specify a parameter directory during inference, then by default if the input file path was `/path/to/sample.fa` the parameters would have been written to `_output/_path_to_sample/`.
+You could thus for instance simulate based on this parameter dir with:
+
+`partis simulate --parameter-dir _output/_path_to_sample --outfname simu.yaml --n-sim-events 3 --debug 1`
+
+where `--debug 1` prints to stdout what the rearrangement events look like as they're being made.
+The resulting output file follows regular output [format](output-formats.md), with an additional column `reco_id` to identify clonal families (it's a hash of the rearrangement parameters).
+When subsequently running inference on this simulation, you typically want to pass the `--is-simu` option.
+During parameter caching, this will write a separate parameter directory with the true parameters (in a addition to `sw/` and `hmm/`).
+During annotation and partitioning, with `--debug 1` it will print the true rearrangements and partitions along with the inferred ones.
+
+Running bcr-phylo for 3. is handled by running `./bin/bcr-phylo-run.py`.
+This should work fine with no arguments, but in order to change the script's many options run with `--help`, and also look at the corresponding options in [packages/bcr-phylo-benchmark/bin/simulator.py](packages/bcr-phylo-benchmark/bin/simulator.py).
+Note that by default bcr-phylo-run.py turns off context-dependent mutation in bcr-phylo, since this is much faster, but if you want it to mutate with the S5F model you can set `--context-depend`.
+
+You can also simulate paired heavy/light repertoires, for example:
+```
+partis simulate --paired-loci igh:igk --parameter-dir /path/to/igh/parameters --light-chain-parameter-dir /path/to/igk/parameters --outfname simu-igh.yaml --light-chain-outfname simu-igk.yaml
+```
+This first generates a series of trees (as normal), then for each locus simulates a rearrangement event for each tree in order.
+The result is that each of the events in the heavy chain output file corresponds (in order) to an event in the light chain output file with the same sequence ids and stemming from the same tree.
+
+Partly because the simulation is so easy to parallelize (use `--n-procs N` and see [here](parallel.md)), its run time is not usually a limiting factor.
+With default parameters, 10,000 sequences takes about 8 minutes with one core (so a million sequences on ten cores would take an hour and a half), although this depends a lot on the family size distribution and mutation levels you specify.
+If you don't care very much about the details of the mutation model, you can get a factor of ten speedup by setting `--no-per-base-mutation`, which uses a simpler model in bppseqgen that doesn't account for different rates to different bases (e.g. A->T vs A->G).
+
+There are a wide variety of options for manipulating how the characteristics of the simulation deviate from the template data sample.
+This is an incomplete list, and is not always up to date, so for better information run `partis simulate --help`.
+
+**Miscellaneous:**
+
+| option                           | description
+|----------------------------------|-----------------------------------------------------------------
+| `--mutation-multiplier <factor>` | multiply the observed SHM rate by `<factor>`
+| `--mimic-data-read-length`       | by default the simulation creates reads that extend through all of V and J. This tells it, instead, to truncate on the 5' and 3' ends according to the lengths/frequencies seen in the template data sample.
+| `--paired-loci <igx:igy>`        | simulate paired heavy and light chain sequences [see below](#paired-heavy-and-light-chains).
+
+**Tree control:**
+
+Even when mimicking parameters from a sample, it does not mimic the inferred clonal family size distribution, i.e. number of leaves/trees (although this would be easy to implement if someone asked for it).
+There are, however, several options to manipulate this:
+
+| option                                        | description
+|-----------------------------------------------|-----------------------------------------------------------------
+| `--n-trees <N>`                               | Before actually generating events, we first make a set of `<N>` phylogentic trees. For each event, we then choose a tree at random from this set. Defaults to the value of --n-sim-events.
+| `--n-leaf-distribution <geometric,box,zipf>`  | When generating these trees, from what distribution should the number of leaves be drawn?
+| `--n-leaves <N>`                              | Parameter controlling the n-leaf distribution (e.g. for the geometric distribution, it's the mean number of leaves)
+| `--constant-number-of-leaves`                 | instead of drawing the number of leaves for each tree from a distribution, force every tree to have the same number of leaves
+| `--root-mrca-weibull-parameter`               | adjusts tree balance/speciation by switching to TreeSimGM (useful range: 0.3 to 1.3)
+| `--n-trees <N>`                               | Before actually generating events, we first make a set of `<N>` phylogentic trees. For each event, we then choose a tree at random from this set. Defaults to the value of --n-sim-events.
+| `--input-simulation-treefname <N>`            | File with list of trees as newick-formatted lines, from which to draw for each event (instead of generating with TreeSim or TreeSimGM). Note that a) the tree depths are rescaled according to the shm rates requested by other command line arguments, i.e. the depths in the tree file are ignored, and b) the resulting sequences do not use the leaf names from the trees.
+
+**SHM indel control:**
+
+| option                          | description
+|---------------------------------|-----------------------------------------------------------------
+| `--indel-frequency <f>`         | fraction of simulated sequences which will contain SHM indels (currently, insertions and deletions are generated with equal probability, although this would be easy to change)
+| `--n-indels-per-indeld-seq <l>` | once we've decided a sequence will have at least one indel, we choose the actual number of indels from this colon-separated list of integers
+| `--mean-indel-length <N>`       | mean length of each SHM insertion or deletion
+| `--indel-location <v,cdr3,<pos>>`| if not set (default), indels are placed uniformly over the whole sequence. If set to `v` or `cdr3` indels are restricted to that portion of the sequence. If set to a `<pos>`, all indels occur at that position in the sequence.
+
+**Scratch parameters:**
+
+In order to deviate more profoundly from the template data sample (or to use no template sample at all), there are a number of options centered around `--rearrange-from-scratch`:
+
+| option                            | description
+|-----------------------------------|-----------------------------------------------------------------
+| `--rearrange-from-scratch`        |  Don't use an existing parameter directory for rearrangement-level parameters, and instead make up some plausible stuff from scratch. Have to also set --shm-parameter-dir.
+| `--mutate-from-scratch`           |  Don't use an existing parameter directory for shm-level (mutation) parameters, and instead make up stuff from scratch (by default this means shm rate varies over positions and sequences, but is the same for all regions). Have to also set --reco-parameter-dir.
+| `--simulate-from-scratch`         |  same as setting both --rearrange-from-scratch and --mutate-from-scratch
+| `--shm-parameter-dir`             |  parameter directory from which to retrieve shm-level info when --rearrange-from-scratch is set (to set germline info, use --initial-germline-dir).
+| `--reco-parameter-dir`            |  parameter directory from which to retrieve rearrangement-level info when --mutate-from-scratch is set (to set germline info, use --initial-germline-dir).
+| `--scratch-mute-freq`             |  shm rate used by --mutate-from-scratch
+| `--flat-mute-freq`                |  use the same shm rate (--scratch-mute-freq) for all positions (in practice it's not that much flatter than the Gamma that is used by default --mutate-from-scratch). For use with --mutate-from-scratch.
+| `--same-mute-freq-for-all-seqs`   |  use the same shm rate (--scratch-mute-freq) for all sequences. For use with --mutate-from-scratch. NOTE: this means we tell bppseqgen to use the same expected rate for every sequence -- there's still variance in the resulting number of output mutation per sequence.
+
+**Germline set control:**
+
+By default, the germline set (set of germline V, D, and J genes) used for simulation, and their prevalence frequencies, are taken from the template data sample (i.e. from `<--parameter-dir>/hmm/germline-sets/<locus>`.
+However, if you have a particular germline set that you want to use, that can be specified with `--initial-germline-dir` (the format, of three fastas and a csv, should mimic that in data/germlines/human/igh).
+You can restrict the genes that are then actually used for simulation with `--only-genes`:
+
+| option                        | description
+|-------------------------------|-----------------------------------------------------------------
+| `--initial-germline-dir <dir>`| simulate with the germline set in `<dir>`, instead of the one from --parameter-dir
+| `--only-genes <gene-list>`    | restrict the germline set to `<gene-list>`, specified as a colon-separated list of genes, for instance `IGHV3-53*03:IGHJ3*02` (any regions that have no genes in the list, like the D region in this example, will be unrestricted).
+
+Instead of modifying an existing per-sample germline set with the options above, you can also direct partis to generate the germline set by choosing genes from an existing species-wide set with `--generate-germline-set` (use --help to see default values).
+The species-wide germline set defaults to the imgt set, but can be set with `--initial-germline-dir`.
+
+| option                                 | description
+|----------------------------------------|-----------------------------------------------------------------
+| `--generate-germline-set`              | generate a realistic germline set from scratch, rather than mimicking an existing germline set (`--rearrange-from-scratch` must also be set)
+| `--n-genes-per-region <m:n:q>`         | number of genes to choose for each of the V, D, and J regions (colon-separated list ordered like v:d:j)
+| `--n-sim-alleles-per-gene <stuff>`     | mean number of alleles to choose for each gene, for each region (colon-separated list, e.g. '1.3:1.2:1.1' will choose either 1 or 2 alleles for each gene with the proper probabilities such that the mean alleles per gene is 1.3 for V, 1.2 for D, and 1.1 for J)
+| `--min-sim-allele-prevalence-freq <f>` | minimum prevalence ratio between any two alleles in the germline set. I.e., the prevalence for each allele is chosen such that the ratio of any two is between `<f>` and 1
+| `--allele-prevalence-fname`            | not really designed to be modified or used by hand, but used by `--allele-prevalence-freqs` option to `bin/test-germline-inference.py` (see below)
+
+
+Details of the generated germline set will be printed to stdout, and after simulation the prevalence frequencies are also checked and printed.
+
+**Generating novel alleles:**
+
+There are also several ways to generate novel alleles, i.e. alleles that are not in an existing germline set.
+Because this is somewhat complicated, we describe these options using the helper script `bin/test-germline-inference.py`, which automates a simulation run and subsequent partis germline inference on that simulation (run `./bin/test-germline-inference.py --help` for examples).
+
+You first need to either give it an explicit list of genes to use, or tell it to generate a germline set from scratch:
+
+| option                   | description
+|--------------------------|-----------------------------------------------------------------
+| `--sim-v-genes <v-list>` | colon-separated list of V genes to use for simulation
+| `--inf-v-genes <v-list>` | start from this list of V genes, and try to infer the genes from --sim-v-genes
+| `--dj-genes <dj-list>`   | D and J genes used for both simulation and inference
+| `--gls-gen`              | instead of using explicit gene lists, generate a full germline set from scratch (see --generate-germline-set in `partis simulate --help` for details)
+
+You can then add novel alleles to the germline set by telling it how many novel alleles, with how many SNPs and/or indels, and where to introduce the SNPs/indels:
+
+| option                                  | description
+|-----------------------------------------|-----------------------------------------------------------------
+| `--nsnp-list <m:n:...>`                 | list of the number of SNPs to generate for each novel allele (each at a random position in the sequence). If --gls-gen is not set, length must equal length of <--sim-v-genes>.  E.g. '0:1:3' will generate two novel alleles, separated by 1 and 3 SNPs from the second and third genes in --sim-v-genes
+| `--nindel-list <m:n:...>`               | same as --nsnp-list, but for indels
+| `--snp-positions <stuff>`               | colon-separated list of comma-separated SNP positions for each gene, e.g. '3,71:45' will generate two novel alleles, separated by two SNPs (at zero-indexed sequence positions 3 and 71) and one SNP (at 45) from the two genes in --sim-v-genes.
+| `--indel-positions <m:n:...>`           | same as --snp-positions, but for indels
+| `--allele-prevalence-freqs <f1:f2:...>` | colon-separated list of allele prevalence frequencies, including newly-generated snpd genes (ordered alphabetically)
+
+
+### Miscellany
+
+##### paired heavy and light chains
+TODO
+
+##### naive probability estimates
+
+The script `bin/get-naive-probabilities.py` is designed to answer the question "What is the probability of a particular rearrangement in this sample?".
+It uses the `all-probs.csv` file that is written to each parameter directory, which contains a line counting how many times we saw each unique rearrangement in that sample.
+Using a yaml config file, you can have the script use a variety of criteria, for instance, find the probability of rearrangements that use any IGHV1 family gene, and that have CDR3 length of 60, 63, or 66.
+For more details run `./bin/get-naive-probabilities.py --help`.
+
+##### input meta info
+
+In many cases partis input will consist of only sequences and names.
+In others, however, there is additional information associated with each sequence, which we refer to as meta info.
+Because the fasta format only specifies how to write sequences and names, most ways in which people add additional information to fasta files are mutually incompatible.
+This meta info is thus specified in partis via a separate yaml file with the argument `--input-metafname <meta.yaml>`, which for example might contain:
+
+```
+seq-1:
+  multiplicity: 1
+  affinity: 0.04
+  timepoint: -1d
+seq-2:
+  multiplicity: 3
+  affinity: 0.1
+  timepoint: +7d
+```
+
+Currently accepted keys are multiplicity, affinity, subject, timepoint, and constant-region; values will be propagated through to appear in any output files (with the key names changed to plural, e.g. to multiplicities, to accomodate multi-sequence annotations).
+When caching parameters, partis by default removes constant regions (5' of v and 3' of j).
+If --collapse-duplicate-sequences is set, it then collapses any duplicate sequences into the [duplicates key](output-formats.md); the number of such sequences is then added to any multiplicities from `--input-metafname` (see also `--dont-remove-framework-insertions`).
+
+##### naive sequence comparison with linearham
+
+While partis's inferred naive sequences are much more accurate than those from single-sequence annotations, its use of a star tree assumption for computational tractability limits achievable accuracy for highly unbalanced trees.
+The [linearham](https://github.com/matsengrp/linearham/) package is designed to solve this by performing simultaneous phylogenetic and rearrangement inference on single families.
+As described above, you can use partis's `--calculate-alternative-annotations` option to have it output some (heuristic) probabilities of alternative annotations, including naive sequences.
+If you've run linearham, you thus have collections of naive sequences and their probabilities from both programs.
+You can compare them with the script `bin/cf-linearham.py`, which prints (view with `less -RS`) first a comparison of the amino acid naive sequences from each program, then a comparison of the nucleotide naive sequences contributing to each of the amino acid ones.
+It also prints a comparison of partis's alternative gene calls and associated "probabilities" (linearham will have only used the one, best, set of gene calls with which it was called).
