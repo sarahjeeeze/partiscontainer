@@ -137,7 +137,7 @@ def copy_extras():
         src = os.path.join(directory,'..','partis')
         files = [u'igh',u'igk',u'igl',u'tra',u'trb',u'trd',u'trg']
         
-        original = os.path.join(directory,'..','..','..','partis','data','germlines',str(species))
+        original = os.path.join(directory,'..','..','..','data','germlines',str(species))
         for original_file in files:
             source = os.path.join(original,original_file,'extras.csv')
             destination = os.path.join(src,original_file)

@@ -1,9 +1,0 @@
-input.tree.file=../Data/LSU.dnd
-input.tree.format=Newick
-
-output.drawing.file=LSU.svg
-output.drawing.format=Svg()
-output.drawing.plot=Phylogram(xu=300, yu=12, direction.h=left2right, direction.v=bottom2top, draw.leaves=yes)
-//output.drawing.plot=Phylogram(xu=300, yu=12, direction.h=left2right, direction.v=top2bottom)
-
-
