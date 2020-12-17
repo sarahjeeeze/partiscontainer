@@ -10,7 +10,7 @@ def csvtotsv(x):
 
     
     df = pd.read_csv(x)
-    newdf = df[['unique_ids', 'invalid','v_gene', 'd_gene', 'j_gene']].copy()
+    newdf = df[['unique_ids', 'invalid','v_gene', 'd_gene', 'j_gene','cdr3_seqs']].copy()
     
 
 
