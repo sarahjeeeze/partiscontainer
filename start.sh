@@ -54,14 +54,14 @@ collect_fastas()
 collect_fastas $INPUT_DIR $INPUT_DIR "*.fasta"
 #this converts IMGT germline to Partis germline but not actually using the germline output yet because of extras file confusion.
 cp -R $GERMLINE_DIR $GERMLINE_BUILD_DIR
-python /partis/additionalScripts/germlineToPartisFormat.py $GERMLINE_BUILD_DIR/germlines
+python /partis/additionalScripts/germlineToPartis.py $GERMLINE_BUILD_DIR/GERMLINE $SPECIES
 
 NR_FASTA=$(cat $INPUT_DIR | wc -l)
 for filename in "$INPUT_DIR"/*; do
 	echo "Processing file: $filename"
 	echo ""
 		echo ""
-		COMMAND="python ../partis/bin/partis annotate --infname /partis/sampledata/input/sample.fasta --initial-germline-dir /partis/data/germlines/human --locus $RECEPTOR --extra-annotation-columns cdr3_seqs --outfname $OUTPUT_DIR/partis.csv"
+		COMMAND="python ../partis/bin/partis annotate --infname /INPUT/sample.fasta --initial-germline-dir /GERMLINE_BUILD_DIR/partis --locus $RECEPTOR --extra-annotation-columns cdr3_seqs --outfname $OUTPUT_DIR/partis.csv"
 		echo ""
 		eval $COMMAND
 	done
@@ -78,4 +78,4 @@ for filename in "$OUTPUT_DIR"/*; do
 
 
 
-cp finalpartis.tsv /OUTPUT	
+cp /partis/finalpartis.tsv /OUTPUT	
