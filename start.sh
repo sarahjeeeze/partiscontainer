@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #change these to the volumes! eg. make the volumes sampledata/input etc and change these to just input/output/germlines
-INPUT_DIR=/partis/sampledata/input
-OUTPUT_DIR=/partis/sampledata/output
-GERMLINE_DIR=/partis/sampledata/germlines
+INPUT_DIR=/INPUT
+OUTPUT_DIR=/OUTPUT
+GERMLINE_DIR=/GERMLINE
 
-GERMLINE_BUILD_DIR=/partis/GERMLINE_BUILD_DIR
+GERMLINE_BUILD_DIR=/GERMLINE_BUILD_DIR
 mkdir -p $GERMLINE_BUILD_DIR
 #temporary while i need to clarify a few things with Erand
 #INPUT_FASTA= /INPUT/sample.fasta
@@ -78,4 +78,4 @@ for filename in "$OUTPUT_DIR"/*; do
 
 
 
-	
+cp finalpartis.tsv /OUTPUT	
