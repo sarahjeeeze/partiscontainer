@@ -1,0 +1,25 @@
+## Partis container for Benchmarking Platform
+
+Docker instructions 
+
+
+
+
+```docker pull sarahjeeze/partiscontainer```
+
+```docker built -t partisconatiner . ```
+
+```docker run \ <br  />
+     -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/INPUT:/INPUT \ <br  />
+     -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/OUTPUT:/OUTPUT  \  <br  />
+     -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/GERMLINES:/GERMLINES \ <br  />
+     partiscontainer start.sh species receptor  <br  />
+```
+
+
+Output file - finalOutput.tsv in output folder.
+
+
+TO DO - 
+
+Change column headings
