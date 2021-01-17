@@ -9,6 +9,7 @@ Docker instructions
 
 ```docker built -t partiscontainer . ``` 
 
+<<<<<<< Updated upstream
 
 
 ``` docker run  
@@ -16,6 +17,14 @@ Docker instructions
      -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/OUTPUT:/OUTPUT  \ 
      -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/GERMLINES:/GERMLINES \ 
      partiscontainer start.sh species receptor  ```
+=======
+```docker run \ <br  />```
+   ```  -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/INPUT:/INPUT \ ```
+  ```   -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/OUTPUT:/OUTPUT  \  ```
+   ```  -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/GERMLINES:/GERMLINES \ ```
+  ```   partiscontainer start.sh species receptor  ```
+```
+>>>>>>> Stashed changes
 
 
 Output file - finalOutput.tsv in output folder.
