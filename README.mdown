@@ -14,7 +14,6 @@ Docker instructions
   ```   -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/OUTPUT:/OUTPUT  \  ```\
    ```  -v /tmp/44fd3574-ca1e-49b5-8955-51ec5aa2609e/GERMLINES:/GERMLINES \ ```\
   ```   partiscontainer start.sh species receptor  ```
-```
 
 
 Output file - finalOutput.tsv in output folder.
