@@ -1,3 +1,5 @@
+"""Script to change format of Germline to the one required for Partis """
+
 from __future__ import absolute_import
 from __future__ import with_statement
 import os, shutil
@@ -8,6 +10,7 @@ import csv
 import sys
 import re
 from shutil import copyfile
+
 directory = str(sys.argv[1])
 
 species = str(sys.argv[2])
