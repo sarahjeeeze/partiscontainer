@@ -19,8 +19,8 @@ def csvtotsv(x):
     df2['productive']*= 1
     df2['productive'].replace({0: True, 1: False}, inplace=True)
     df2['sequence_ids'] = df2['sequence_ids'].str.replace('c',':')
-    df2['cdr3_aa'] = df2['cdr3_aa'].apply(lambda x: (Seq(str(x)).translate()))
-    
+
+    df2.loc[df2.productive == True, 'cdr3_aa'] = df2['cdr3_aa'].apply(lambda x: (Seq(str(x)).translate()))
    
     df2.to_csv('finalpartis.tsv', sep = '\t')
 
