@@ -19,6 +19,3 @@ Docker instructions
 Output file - finalOutput.tsv in output folder.
 
 
-TO DO - 
-
-Change column headings
